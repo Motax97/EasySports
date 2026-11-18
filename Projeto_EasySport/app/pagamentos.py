@@ -1,0 +1,218 @@
+import re
+from datetime import datetime
+
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+
+from app.access import login_required
+from app.extensions import db
+from app.models import EstadoReserva, Espaco, Pagamento, Reserva, User
+from app.security import imagem_segura
+
+pagamentos_bp = Blueprint("pagamentos", __name__)
+
+
+# Confirma se o utilizador atual pode aceder a reserva.
+def _pode_ver_reserva(reserva):
+    return session.get("is_admin") or reserva.idUser == session.get("user_id")
+
+
+# Guarda apenas os ultimos quatro digitos do cartao.
+def _ultimos4_cartao(numero_cartao):
+    digitos = "".join(char for char in numero_cartao if char.isdigit())
+    return digitos[-4:] if len(digitos) >= 4 else ""
+
+
+# Valida os dados sensiveis do pagamento no backend.
+def _validar_dados_pagamento(form_data):
+    numero_cartao_raw = form_data["numeroCartao"].strip()
+    validade = form_data["validade"].strip()
+    cvv = form_data["cvv"].strip()
+
+    if not re.fullmatch(r"[\d ]+", numero_cartao_raw):
+        return "O numero do cartao deve conter apenas numeros."
+
+    numero_cartao = numero_cartao_raw.replace(" ", "")
+    if not numero_cartao.isdigit() or not 12 <= len(numero_cartao) <= 19:
+        return "Introduz um numero de cartao valido com 12 a 19 digitos."
+
+    validade_match = re.fullmatch(r"(\d{2})/(\d{2})", validade)
+    if not validade_match:
+        return "Introduz a validade no formato MM/AA."
+
+    mes = int(validade_match.group(1))
+    if mes < 1 or mes > 12:
+        return "Introduz um mes de validade entre 01 e 12."
+
+    ano = 2000 + int(validade_match.group(2))
+    agora = datetime.now()
+    if ano < agora.year or (ano == agora.year and mes < agora.month):
+        return "Introduz uma data de validade que ainda nao tenha expirado."
+
+    if not cvv.isdigit():
+        return "O CVV deve conter apenas numeros."
+
+    if not re.fullmatch(r"\d{3,4}", cvv):
+        return "Introduz um CVV com 3 ou 4 digitos."
+
+    form_data["numeroCartao"] = numero_cartao
+    form_data["cvv"] = cvv
+    form_data["validade"] = validade
+    return None
+
+
+# Prepara os dados usados pelo template de checkout.
+def _contexto_checkout(reserva, pagamento):
+    espaco = Espaco.query.get(reserva.idEspaco)
+    utilizador = User.query.get(reserva.idUser)
+    duracao_horas = int((reserva.dataFim - reserva.dataInicio).total_seconds() / 3600)
+    imagem_espaco = imagem_segura(espaco.imagem if espaco else None)
+
+    return {
+        "reserva": reserva,
+        "espaco": espaco,
+        "pagamento": pagamento,
+        "imagem_espaco": imagem_espaco,
+        "resumo": {
+            "espaco": espaco.nome if espaco else "Espaco indisponivel",
+            "modalidade": (espaco.modalidade or "Espaco desportivo").strip() if espaco else "Espaco desportivo",
+            "data": reserva.dataInicio.strftime("%d/%m/%Y"),
+            "inicio": reserva.dataInicio.strftime("%H:%M"),
+            "fim": reserva.dataFim.strftime("%H:%M"),
+            "duracao": f"{duracao_horas} hora" if duracao_horas == 1 else f"{duracao_horas} horas",
+            "preco_hora": f"{(espaco.precoHora if espaco else 0):.2f} EUR",
+            "total": f"{pagamento.valor:.2f} EUR",
+        },
+        "form_data": {
+            "nomeFaturacao": pagamento.nomeFaturacao or (utilizador.nome if utilizador else ""),
+            "emailFaturacao": pagamento.emailFaturacao or (utilizador.email if utilizador else ""),
+            "morada": pagamento.morada or "",
+            "codigoPostal": pagamento.codigoPostal or "",
+            "localidade": pagamento.localidade or "",
+            "pais": pagamento.pais or "Portugal",
+            "numeroCartao": "",
+            "validade": "",
+            "cvv": "",
+        },
+    }
+
+
+# Verifica se outra reserva confirmada ocupa o mesmo horario.
+def _tem_conflito_confirmado(reserva):
+    conflito = Reserva.query.filter(
+        Reserva.id != reserva.id,
+        Reserva.idEspaco == reserva.idEspaco,
+        Reserva.estado == EstadoReserva.confirmada,
+        Reserva.dataInicio < reserva.dataFim,
+        Reserva.dataFim > reserva.dataInicio,
+    ).first()
+
+    return conflito is not None
+
+
+# Cancela a reserva pendente quando o horario deixou de estar livre.
+def _cancelar_por_conflito(reserva, pagamento):
+    if reserva.estado == EstadoReserva.pendente:
+        reserva.estado = EstadoReserva.cancelada
+
+    if pagamento and pagamento.estado != "pago":
+        pagamento.estado = "cancelado"
+        pagamento.dataPagamento = None
+
+    db.session.commit()
+
+    flash("Este horario ja nao esta disponivel. A tua reserva pendente foi cancelada.", "danger")
+
+    if session.get("is_admin"):
+        return redirect(url_for("reservas.listar_reservas"))
+
+    return redirect(url_for("reservas.minha_reservas"))
+
+
+@pagamentos_bp.route("/checkout/<int:reserva_id>")
+@login_required
+def checkout_reserva(reserva_id):
+    reserva = Reserva.query.get_or_404(reserva_id)
+    if not _pode_ver_reserva(reserva):
+        flash("Acesso restrito", "danger")
+        return redirect(url_for("main.index"))
+
+    pagamento = Pagamento.query.filter_by(idReserva=reserva.id).first_or_404()
+
+    if reserva.estado == EstadoReserva.cancelada or pagamento.estado == "cancelado":
+        flash("Nao e possivel pagar uma reserva cancelada", "danger")
+        return redirect(url_for("reservas.minha_reservas"))
+
+    if pagamento.estado == "pago":
+        flash("Esta reserva ja se encontra paga", "success")
+        return redirect(url_for("reservas.minha_reservas"))
+
+    if _tem_conflito_confirmado(reserva):
+        return _cancelar_por_conflito(reserva, pagamento)
+
+    return render_template("checkout_pagamento.html", **_contexto_checkout(reserva, pagamento))
+
+
+@pagamentos_bp.route("/checkout/<int:reserva_id>", methods=["POST"])
+@login_required
+def processar_checkout_reserva(reserva_id):
+    reserva = Reserva.query.get_or_404(reserva_id)
+    if not _pode_ver_reserva(reserva):
+        flash("Acesso restrito", "danger")
+        return redirect(url_for("main.index"))
+
+    pagamento = Pagamento.query.filter_by(idReserva=reserva.id).first_or_404()
+
+    if reserva.estado == EstadoReserva.cancelada or pagamento.estado == "cancelado":
+        flash("Nao e possivel pagar uma reserva cancelada", "danger")
+        return redirect(url_for("reservas.minha_reservas"))
+
+    if pagamento.estado == "pago":
+        flash("Esta reserva ja se encontra paga", "success")
+        return redirect(url_for("reservas.minha_reservas"))
+
+    if _tem_conflito_confirmado(reserva):
+        return _cancelar_por_conflito(reserva, pagamento)
+
+    form_data = {
+        "nomeFaturacao": request.form.get("nomeFaturacao", "").strip(),
+        "emailFaturacao": request.form.get("emailFaturacao", "").strip(),
+        "morada": request.form.get("morada", "").strip(),
+        "codigoPostal": request.form.get("codigoPostal", "").strip(),
+        "localidade": request.form.get("localidade", "").strip(),
+        "pais": request.form.get("pais", "").strip(),
+        "numeroCartao": request.form.get("numeroCartao", "").strip(),
+        "validade": request.form.get("validade", "").strip(),
+        "cvv": request.form.get("cvv", "").strip(),
+    }
+
+    if not all(form_data.values()):
+        flash("Preenche todos os dados de faturacao e pagamento", "danger")
+        context = _contexto_checkout(reserva, pagamento)
+        context["form_data"] = form_data
+        return render_template("checkout_pagamento.html", **context)
+
+    mensagem_validacao = _validar_dados_pagamento(form_data)
+    if mensagem_validacao:
+        flash(mensagem_validacao, "danger")
+        context = _contexto_checkout(reserva, pagamento)
+        context["form_data"] = form_data
+        return render_template("checkout_pagamento.html", **context)
+
+    ultimos4 = _ultimos4_cartao(form_data["numeroCartao"])
+
+    pagamento.nomeFaturacao = form_data["nomeFaturacao"]
+    pagamento.emailFaturacao = form_data["emailFaturacao"]
+    pagamento.morada = form_data["morada"]
+    pagamento.codigoPostal = form_data["codigoPostal"]
+    pagamento.localidade = form_data["localidade"]
+    pagamento.pais = form_data["pais"]
+    pagamento.ultimos4Cartao = ultimos4
+    pagamento.estado = "pago"
+    pagamento.dataPagamento = datetime.now()
+
+    reserva.estado = EstadoReserva.confirmada
+
+    db.session.commit()
+
+    flash("Pagamento realizado com sucesso. A reserva ficou confirmada.", "success")
+    return redirect(url_for("reservas.minha_reservas"))

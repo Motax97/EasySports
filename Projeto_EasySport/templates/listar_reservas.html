@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Consultar reservas | EasySport</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/base.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/admin.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/reservas-admin.css') }}"
+    />
+  </head>
+
+  <body class="admin-page">
+    <div class="admin-shell">
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        <header class="admin-header">
+          <a class="admin-brand" href="{{ url_for('main.admin_dashboard') if is_admin_view else url_for('main.espacos_homepage') }}">
+            <img
+              class="admin-brand__logo"
+              src="{{ url_for('static', filename='img/easysport-logo.png') }}"
+              alt="Logo EasySport"
+            />
+            <div>
+              <p class="admin-brand__eyebrow">
+                {% if is_admin_view %}Painel de Reservas{% else %}As minhas reservas{% endif %}
+              </p>
+              <h1>EasySport</h1>
+            </div>
+          </a>
+
+          <div class="admin-userpanel">
+            <details class="admin-profile-menu">
+              <summary class="admin-profile-button">
+                <span class="admin-profile-avatar" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 12a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 12Zm0 2.25c-4.23 0-7.75 2.16-7.75 4.75a1 1 0 0 0 1 1h13.5a1 1 0 0 0 1-1c0-2.59-3.52-4.75-7.75-4.75Z" />
+                  </svg>
+                </span>
+                <span class="admin-profile-content">
+                  <span class="admin-profile-label">
+                    {% if is_admin_view %}Administrador{% else %}Utilizador{% endif %}
+                  </span>
+                  <strong>{{ session["username"] }}</strong>
+                </span>
+                <span class="admin-profile-chevron" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" focusable="false">
+                    <path d="m5.25 7.5 4.75 5 4.75-5" />
+                  </svg>
+                </span>
+              </summary>
+
+              <div class="admin-profile-dropdown">
+                {% if is_admin_view %}
+                  <a class="admin-profile-link" href="{{ url_for('main.admin_dashboard') }}">Painel principal</a>
+                  <a class="admin-profile-link" href="{{ url_for('main.listar_utilizadores') }}">Gerir utilizadores</a>
+                  <a class="admin-profile-link" href="{{ url_for('main.listar_espacos_page') }}">Gerir espa&ccedil;os</a>
+                  <a class="admin-profile-link" href="{{ url_for('main.estatisticas_sistema') }}">Estat&iacute;sticas do Sistema</a>
+                {% else %}
+                  <a class="admin-profile-link" href="{{ url_for('main.espacos_homepage') }}">In&iacute;cio</a>
+                  <a class="admin-profile-link" href="{{ url_for('main.listar_espacos_page') }}">Ver espa&ccedil;os</a>
+                  <a class="admin-profile-link" href="{{ url_for('main.perfil_utilizador') }}">Perfil</a>
+                {% endif %}
+                <a class="admin-profile-link admin-profile-link--logout" href="{{ url_for('auth.logout') }}">Logout</a>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        <main class="admin-main reservations-main{% if is_admin_view %} reservations-main--admin{% endif %}">
+          {% if messages %}
+            <div class="admin-messages flash-stack">
+              {% for category, message in messages %}
+                <div class="admin-alert admin-alert--{{ category }} flash-message" data-flash-message>
+                  <span class="flash-message__text">{{ message }}</span>
+                  <button class="flash-message__close" type="button" aria-label="Fechar notifica&ccedil;&atilde;o" data-flash-close>&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if is_admin_view %}
+            <section class="admin-section">
+              <div class="admin-summary-grid admin-summary-grid--compact">
+                {% for item in summary_cards %}
+                  <article class="admin-summary-card">
+                    <div class="admin-summary-card__top">
+                      <div class="admin-summary-card__icon" aria-hidden="true">
+                        {% if item.icone == "calendar" %}
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M7 3a1 1 0 0 1 1 1v1h8V4a1 1 0 1 1 2 0v1h.5A2.5 2.5 0 0 1 21 7.5v11A2.5 2.5 0 0 1 18.5 21h-13A2.5 2.5 0 0 1 3 18.5v-11A2.5 2.5 0 0 1 5.5 5H6V4a1 1 0 0 1 1-1Zm12 7H5v8.5a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5Zm-1-3H6a1 1 0 0 0-1 1v.5h14V8a1 1 0 0 0-1-1Z" />
+                          </svg>
+                        {% elif item.icone == "pending" %}
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M12 3.5A8.5 8.5 0 1 0 20.5 12 8.51 8.51 0 0 0 12 3.5Zm1 4.5v4.09l2.8 1.68-.8 1.32-3.5-2.09V8Z" />
+                          </svg>
+                        {% elif item.icone == "active" %}
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M9.55 17.25 4.8 12.5l1.4-1.4 3.35 3.34 8.25-8.24 1.4 1.4Z" />
+                          </svg>
+                        {% else %}
+                          <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M7.4 6 6 7.4 10.6 12 6 16.6 7.4 18 12 13.4 16.6 18l1.4-1.4-4.6-4.6L18 7.4 16.6 6 12 10.6Z" />
+                          </svg>
+                        {% endif %}
+                      </div>
+                      <span class="admin-summary-card__title">{{ item.titulo }}</span>
+                    </div>
+
+                    <strong class="admin-summary-card__value">{{ item.valor }}</strong>
+                    <p class="admin-summary-card__detail">{{ item.detalhe }}</p>
+                  </article>
+                {% endfor %}
+              </div>
+            </section>
+          {% endif %}
+
+          <section class="admin-section reservations-section">
+            <div class="reservations-panel">
+              <div class="reservations-panel__header">
+                <div>
+                  <p class="admin-section__eyebrow">
+                    {% if is_admin_view %}Consultar reservas{% else %}As minhas reservas{% endif %}
+                  </p>
+                  <h3>
+                    {% if is_admin_view %}Filtra a tua pesquisa{% else %}Acompanha o estado das tuas reservas{% endif %}
+                  </h3>
+                </div>
+              </div>
+
+              {% if is_admin_view %}
+                <form class="reservations-filters" method="get" action="{{ url_for('reservas.listar_reservas') }}">
+                  <label class="reservations-field reservations-field--search">
+                    <span>Pesquisa</span>
+                    <input
+                      type="search"
+                      name="q"
+                      value="{{ filtros.q }}"
+                      placeholder="Utilizador, username ou espa&ccedil;o"
+                    />
+                  </label>
+
+                  <label class="reservations-field">
+                    <span>Estado</span>
+                    <select name="estado">
+                      <option value="">Todos</option>
+                      <option value="pendente" {% if filtros.estado == "pendente" %}selected{% endif %}>Pendente</option>
+                      <option value="confirmada" {% if filtros.estado == "confirmada" %}selected{% endif %}>Confirmada</option>
+                      <option value="cancelada" {% if filtros.estado == "cancelada" %}selected{% endif %}>Cancelada</option>
+                    </select>
+                  </label>
+
+                  <label class="reservations-field">
+                    <span>Data</span>
+                    <input type="date" name="data" value="{{ filtros.data }}" />
+                  </label>
+
+                  <label class="reservations-field">
+                    <span>Espa&ccedil;o</span>
+                    <select name="espaco">
+                      <option value="">Todos</option>
+                      {% for espaco in espaco_opcoes %}
+                        <option value="{{ espaco }}" {% if filtros.espaco == espaco %}selected{% endif %}>{{ espaco }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+
+                  <div class="reservations-filter-actions">
+                    <button class="reservations-button reservations-button--primary" type="submit">Filtrar</button>
+                    <a class="reservations-button reservations-button--ghost" href="{{ url_for('reservas.listar_reservas') }}">Limpar</a>
+                  </div>
+                </form>
+              {% endif %}
+
+              {% if reservas %}
+                <div class="reservations-table-wrap">
+                  <table class="reservations-table">
+                    <thead>
+                      <tr>
+                        {% if is_admin_view %}<th>Utilizador</th>{% endif %}
+                        <th>Espa&ccedil;o</th>
+                        <th>Modalidade</th>
+                        <th>Data</th>
+                        <th>In&iacute;cio</th>
+                        <th>Fim</th>
+                        <th>Estado</th>
+                        <th>Pagamento</th>
+                        <th>A&ccedil;&otilde;es</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for reserva in reservas %}
+                        <tr>
+                          {% if is_admin_view %}
+                            <td>
+                              <div class="reservations-user">
+                                <strong>{{ reserva.utilizador }}</strong>
+                                <span>@{{ reserva.utilizador_username }}</span>
+                              </div>
+                            </td>
+                          {% endif %}
+                          <td>
+                            <div class="reservations-space">
+                              <strong>{{ reserva.espaco }}</strong>
+                              {% if is_admin_view %}
+                                <span>{{ reserva.duracao_label }}</span>
+                              {% endif %}
+                            </div>
+                          </td>
+                          <td>{{ reserva.modalidade }}</td>
+                          <td>{{ reserva.data_label }}</td>
+                          <td>{{ reserva.inicio_label }}</td>
+                          <td>{{ reserva.fim_label }}</td>
+                          <td>
+                            <span class="reservations-badge reservations-badge--{{ reserva.estado }}">
+                              {{ reserva.estado_label }}
+                            </span>
+                          </td>
+                          <td>
+                            <div class="reservations-payment">
+                              <strong class="reservations-payment-value">{{ reserva.pagamento_valor_label }}</strong>
+                              <span class="reservations-payment-state">{{ reserva.pagamento_estado_label }}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="reservations-actions">
+                              {% if is_admin_view %}
+                                {% if reserva.estado != "cancelada" %}
+                                  {% if reserva.estado == "confirmada" %}
+                                    <button
+                                      class="reservations-button reservations-button--ghost js-open-payment-modal"
+                                      type="button"
+                                      data-reserva-espaco="{{ reserva.espaco }}"
+                                      data-reserva-data="{{ reserva.data_label }}"
+                                      data-reserva-hora="{{ reserva.inicio_label }} - {{ reserva.fim_label }}"
+                                      data-pagamento-estado="{{ reserva.detalhe_pagamento.estado }}"
+                                      data-pagamento-valor="{{ reserva.detalhe_pagamento.valor }}"
+                                      data-pagamento-data="{{ reserva.detalhe_pagamento.data_pagamento }}"
+                                      data-pagamento-nome="{{ reserva.detalhe_pagamento.nome_faturacao }}"
+                                      data-pagamento-email="{{ reserva.detalhe_pagamento.email_faturacao }}"
+                                      data-pagamento-morada="{{ reserva.detalhe_pagamento.morada_completa }}"
+                                      data-pagamento-cartao="{{ reserva.detalhe_pagamento.cartao }}"
+                                    >
+                                      Ver
+                                    </button>
+                                  {% endif %}
+
+                                  <form method="post" action="{{ url_for('reservas.cancelar_reserva', reserva_id=reserva.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    <button
+                                      class="reservations-button reservations-button--danger"
+                                      type="submit"
+                                      onclick="return confirm('Cancelar reserva?');"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </form>
+                                {% endif %}
+                              {% else %}
+                                {% if reserva.estado == "confirmada" %}
+                                  <button
+                                    class="reservations-button reservations-button--ghost js-open-payment-modal"
+                                    type="button"
+                                    data-reserva-espaco="{{ reserva.espaco }}"
+                                    data-reserva-data="{{ reserva.data_label }}"
+                                    data-reserva-hora="{{ reserva.inicio_label }} - {{ reserva.fim_label }}"
+                                    data-pagamento-estado="{{ reserva.detalhe_pagamento.estado }}"
+                                    data-pagamento-valor="{{ reserva.detalhe_pagamento.valor }}"
+                                    data-pagamento-data="{{ reserva.detalhe_pagamento.data_pagamento }}"
+                                    data-pagamento-nome="{{ reserva.detalhe_pagamento.nome_faturacao }}"
+                                    data-pagamento-email="{{ reserva.detalhe_pagamento.email_faturacao }}"
+                                    data-pagamento-morada="{{ reserva.detalhe_pagamento.morada_completa }}"
+                                    data-pagamento-cartao="{{ reserva.detalhe_pagamento.cartao }}"
+                                  >
+                                    Ver
+                                  </button>
+                                {% endif %}
+
+                                {% if reserva.estado == "pendente" %}
+                                  <a
+                                    class="reservations-button reservations-button--payment"
+                                    href="{{ url_for('pagamentos.checkout_reserva', reserva_id=reserva.id) }}"
+                                  >
+                                    Pagar
+                                  </a>
+
+                                  <form method="post" action="{{ url_for('reservas.cancelar_reserva', reserva_id=reserva.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                    <button
+                                      class="reservations-button reservations-button--danger"
+                                      type="submit"
+                                      onclick="return confirm('Cancelar reserva?');"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </form>
+                                {% endif %}
+                              {% endif %}
+                            </div>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="reservations-empty">
+                  <h4>Sem reservas para apresentar</h4>
+                  <p>N&atilde;o foram encontrados resultados para os filtros atuais.</p>
+                </div>
+              {% endif %}
+            </div>
+          </section>
+        </main>
+      {% endwith %}
+    </div>
+
+    <div class="reservations-modal" id="payment-modal" hidden>
+      <div class="reservations-modal__backdrop" data-close-modal></div>
+      <div class="reservations-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+        <button class="reservations-modal__close" type="button" data-close-modal aria-label="Fechar detalhe do pagamento">
+          <span aria-hidden="true">&times;</span>
+        </button>
+
+        <div class="reservations-modal__header">
+          <p class="reservations-modal__eyebrow">Detalhe</p>
+          <h3 id="payment-modal-title">Dados de pagamento</h3>
+        </div>
+
+        <div class="reservations-modal__grid">
+          <section class="reservations-modal__card">
+            <h4>Reserva</h4>
+            <dl class="reservations-modal__list">
+              <div><dt>Espa&ccedil;o</dt><dd data-modal="espaco">-</dd></div>
+              <div><dt>Data</dt><dd data-modal="data">-</dd></div>
+              <div><dt>Hor&aacute;rio</dt><dd data-modal="hora">-</dd></div>
+            </dl>
+          </section>
+
+          <section class="reservations-modal__card">
+            <h4>Pagamento</h4>
+            <dl class="reservations-modal__list">
+              <div><dt>Estado</dt><dd data-modal="estado">-</dd></div>
+              <div><dt>Valor</dt><dd data-modal="valor">-</dd></div>
+              <div><dt>Data</dt><dd data-modal="data_pagamento">-</dd></div>
+              <div><dt>Fatura</dt><dd data-modal="nome">-</dd></div>
+              <div><dt>Email</dt><dd data-modal="email">-</dd></div>
+              <div><dt>Morada</dt><dd data-modal="morada">-</dd></div>
+              <div><dt>Cart&atilde;o</dt><dd data-modal="cartao">-</dd></div>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const modal = document.getElementById("payment-modal");
+        const openButtons = document.querySelectorAll(".js-open-payment-modal");
+        const closeButtons = modal ? modal.querySelectorAll("[data-close-modal]") : [];
+        const profileMenu = document.querySelector(".admin-profile-menu");
+
+        if (profileMenu) {
+          document.addEventListener("click", (event) => {
+            if (!profileMenu.contains(event.target)) {
+              profileMenu.removeAttribute("open");
+            }
+          });
+        }
+
+        if (!modal || !openButtons.length) {
+          return;
+        }
+
+        const fields = {
+          espaco: modal.querySelector('[data-modal="espaco"]'),
+          data: modal.querySelector('[data-modal="data"]'),
+          hora: modal.querySelector('[data-modal="hora"]'),
+          estado: modal.querySelector('[data-modal="estado"]'),
+          valor: modal.querySelector('[data-modal="valor"]'),
+          dataPagamento: modal.querySelector('[data-modal="data_pagamento"]'),
+          nome: modal.querySelector('[data-modal="nome"]'),
+          email: modal.querySelector('[data-modal="email"]'),
+          morada: modal.querySelector('[data-modal="morada"]'),
+          cartao: modal.querySelector('[data-modal="cartao"]'),
+        };
+
+        const openModal = (button) => {
+          fields.espaco.textContent = button.dataset.reservaEspaco || "-";
+          fields.data.textContent = button.dataset.reservaData || "-";
+          fields.hora.textContent = button.dataset.reservaHora || "-";
+          fields.estado.textContent = button.dataset.pagamentoEstado || "-";
+          fields.valor.textContent = button.dataset.pagamentoValor || "-";
+          fields.dataPagamento.textContent = button.dataset.pagamentoData || "-";
+          fields.nome.textContent = button.dataset.pagamentoNome || "-";
+          fields.email.textContent = button.dataset.pagamentoEmail || "-";
+          fields.morada.textContent = button.dataset.pagamentoMorada || "-";
+          fields.cartao.textContent = button.dataset.pagamentoCartao || "-";
+
+          modal.hidden = false;
+          document.body.classList.add("modal-open");
+        };
+
+        const closeModal = () => {
+          modal.hidden = true;
+          document.body.classList.remove("modal-open");
+        };
+
+        openButtons.forEach((button) => {
+          button.addEventListener("click", () => openModal(button));
+        });
+
+        closeButtons.forEach((button) => {
+          button.addEventListener("click", closeModal);
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && !modal.hidden) {
+            closeModal();
+          }
+        });
+      })();
+    </script>
+    <script src="{{ url_for('static', filename='js/flash-messages.js') }}"></script>
+  </body>
+</html>

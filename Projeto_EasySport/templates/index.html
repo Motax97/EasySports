@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EasySport</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/base.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/index.css') }}"
+    />
+  </head>
+
+  <body class="home-page">
+    <div class="home-shell">
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% set ns = namespace(login_message=None, login_category='success', other_messages=[]) %}
+        {% for category, message in messages %}
+          {% if session.get("user_id") and message == "Login efetuado com sucesso" and ns.login_message is none %}
+            {% set ns.login_message = message %}
+            {% set ns.login_category = category %}
+          {% else %}
+            {% set ns.other_messages = ns.other_messages + [[category, message]] %}
+          {% endif %}
+        {% endfor %}
+
+        <header class="home-header">
+          <a class="home-brand" href="{{ url_for('main.index') }}">
+            <img
+              class="home-brand__logo"
+              src="{{ url_for('static', filename='img/easysport-logo.png') }}"
+              alt="Logo EasySport"
+            />
+            <div>
+              <p class="home-brand__eyebrow">Plataforma de reservas desportivas</p>
+              <h1>EasySport</h1>
+            </div>
+          </a>
+
+          {% if session.get("user_id") %}
+            <div class="home-userpanel">
+              <details class="home-profile-menu">
+                <summary class="home-profile-button">
+                  <span class="home-profile-avatar" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                      <path d="M12 12a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 12Zm0 2.25c-4.23 0-7.75 2.16-7.75 4.75a1 1 0 0 0 1 1h13.5a1 1 0 0 0 1-1c0-2.59-3.52-4.75-7.75-4.75Z" />
+                    </svg>
+                  </span>
+                  <span class="home-profile-content">
+                    <span class="home-profile-label">A minha conta</span>
+                    <strong>{{ session["username"] }}</strong>
+                  </span>
+                  <span class="home-profile-chevron" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" focusable="false">
+                      <path d="m5.25 7.5 4.75 5 4.75-5" />
+                    </svg>
+                  </span>
+                </summary>
+
+                <div class="home-profile-dropdown">
+                  <a class="home-profile-link" href="{{ url_for('main.listar_espacos_page') }}">Ver espaços</a>
+                  <a class="home-profile-link" href="{{ url_for('reservas.minha_reservas') }}">Consultar reservas</a>
+                  <a class="home-profile-link" href="{{ url_for('main.perfil_utilizador') }}">Perfil</a>
+                  <a class="home-profile-link home-profile-link--logout" href="{{ url_for('auth.logout') }}">Logout</a>
+                </div>
+              </details>
+
+              {% if ns.login_message %}
+                <div class="home-profile-alert home-profile-alert--{{ ns.login_category }} flash-message" data-flash-message>
+                  <span class="flash-message__text">{{ ns.login_message }}</span>
+                  <button class="flash-message__close" type="button" aria-label="Fechar notificação" data-flash-close>&times;</button>
+                </div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="home-userbar">
+              <a class="home-button home-button--secondary" href="{{ url_for('auth.login_page') }}">
+                Login
+              </a>
+              <a class="home-button" href="{{ url_for('auth.register_page') }}">
+                Registar
+              </a>
+            </div>
+          {% endif %}
+        </header>
+
+        <main class="home-main">
+          <section class="home-hero">
+            <p class="home-hero__eyebrow">Espaços em destaque</p>
+            <h2>Encontra o espaço ideal para a tua próxima reserva.</h2>
+            <p class="home-hero__text">Seleciona um espaço real da plataforma e avança diretamente para a reserva.</p>
+          </section>
+
+          {% if ns.other_messages %}
+            <div class="home-messages flash-stack">
+              {% for category, message in ns.other_messages %}
+                <div class="home-alert home-alert--{{ category }} flash-message" data-flash-message>
+                  <span class="flash-message__text">{{ message }}</span>
+                  <button class="flash-message__close" type="button" aria-label="Fechar notificação" data-flash-close>&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <section class="home-space-grid">
+            {% for espaco in espacos_destaque %}
+              <a
+                class="home-space-card"
+                href="{% if session.get('user_id') %}{{ url_for('reservas.reservar_page', espaco_id=espaco.id) }}{% else %}{{ url_for('auth.login_page') }}{% endif %}"
+              >
+                <img
+                  class="home-space-card__image"
+                  src="{{ url_for('static', filename=espaco.imagem_homepage) }}"
+                  alt="{{ espaco.nome }}"
+                />
+                <div class="home-space-card__content">
+                  <div class="home-space-card__top">
+                    <span class="home-space-card__sport">{{ espaco.modalidade_homepage }}</span>
+                    <span class="home-space-card__status {% if espaco.ativo %}is-available{% else %}is-unavailable{% endif %}">
+                      {% if espaco.ativo %}Disponível{% else %}Indisponível{% endif %}
+                    </span>
+                  </div>
+
+                  <strong>{{ espaco.nome }}</strong>
+                  <p class="home-space-card__description">{{ espaco.descricao_curta }}</p>
+
+                  <div class="home-space-card__bottom">
+                    <span class="home-space-card__price">{{ "%.2f"|format(espaco.precoHora) }}€/hora</span>
+                    <span class="home-space-card__link">Reservar</span>
+                  </div>
+                </div>
+              </a>
+            {% endfor %}
+          </section>
+
+          {% if mostrar_botao_mais_espacos %}
+            <div class="home-more-actions">
+              <a
+                class="home-button home-button--more"
+                href="{% if session.get('user_id') %}{{ url_for('main.listar_espacos_page') }}{% else %}{{ url_for('auth.login_page') }}{% endif %}"
+              >
+                Mais espaços
+              </a>
+            </div>
+          {% endif %}
+        </main>
+      {% endwith %}
+    </div>
+    <script src="{{ url_for('static', filename='js/flash-messages.js') }}"></script>
+  </body>
+</html>

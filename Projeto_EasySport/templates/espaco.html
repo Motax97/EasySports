@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Criar Espaço | EasySport</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/base.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/admin.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/espacos.css') }}"
+    />
+  </head>
+
+  <body class="admin-page spaces-page">
+    <div class="admin-shell">
+      <header class="admin-header">
+        <a class="admin-brand" href="{{ url_for('main.admin_dashboard') }}">
+          <img
+            class="admin-brand__logo"
+            src="{{ url_for('static', filename='img/easysport-logo.png') }}"
+            alt="Logo EasySport"
+          />
+          <div>
+            <p class="admin-brand__eyebrow">Gestão de espaços</p>
+            <h1>EasySport</h1>
+          </div>
+        </a>
+
+        <div class="spaces-header__actions">
+          <a class="spaces-button spaces-button--secondary" href="{{ url_for('espaco.listar_espacos') }}">
+            Voltar à listagem
+          </a>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          <div class="admin-messages flash-stack">
+            {% for category, message in messages %}
+              <div class="admin-alert admin-alert--{{ category }} flash-message" data-flash-message>
+                <span class="flash-message__text">{{ message }}</span>
+                <button class="flash-message__close" type="button" aria-label="Fechar notificação" data-flash-close>&times;</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="spaces-form-section">
+        <article class="spaces-form-card">
+          <div class="admin-section__header">
+            <p class="admin-section__eyebrow">Novo Espaço</p>
+            <h3>Dados do espaço</h3>
+          </div>
+
+          <form class="spaces-form" action="/espaco" method="post" enctype="multipart/form-data" data-custom-validation="true" data-validation-stack-class="admin-messages flash-stack" data-validation-alert-class="admin-alert admin-alert--danger flash-message">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <div class="spaces-form__field">
+              <label for="nome">Nome</label>
+              <input type="text" id="nome" name="nome" placeholder="Nome do espaço" value="{{ form_data.get('nome', '') }}" required />
+            </div>
+
+            <div class="spaces-form__field">
+              <label for="modalidade">Modalidade</label>
+              <input type="text" id="modalidade" name="modalidade" placeholder="Ex: Futebol, Padel, Ténis" value="{{ form_data.get('modalidade', '') }}" required />
+            </div>
+
+            <div class="spaces-form__field">
+              <label for="descricao">Descrição</label>
+              <input type="text" id="descricao" name="descricao" placeholder="Breve descrição do espaço" value="{{ form_data.get('descricao', '') }}" />
+            </div>
+
+            <div class="spaces-form__field">
+              <label for="preco">Preço por hora</label>
+              <input type="number" id="preco" name="preco" placeholder="Preço" value="{{ form_data.get('preco', '') }}" required />
+            </div>
+
+            <div class="spaces-form__field">
+              <label for="imagem">Imagem do espaço</label>
+              <input type="file" id="imagem" name="imagem" accept="image/*" />
+            </div>
+
+            <div class="spaces-form__actions">
+              <button class="spaces-button spaces-button--primary" type="submit">Criar espaço</button>
+              <a class="spaces-button spaces-button--secondary" href="{{ url_for('espaco.listar_espacos') }}">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </article>
+      </section>
+    </div>
+    <script src="{{ url_for('static', filename='js/flash-messages.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/form-validation.js') }}"></script>
+  </body>
+</html>

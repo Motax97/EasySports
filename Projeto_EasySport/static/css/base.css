@@ -1,0 +1,73 @@
+:root {
+  --auth-bg: #f6f1e8;
+  --auth-surface: rgba(255, 252, 247, 0.92);
+  --auth-surface-strong: #fffaf2;
+  --auth-border: rgba(86, 71, 52, 0.12);
+  --auth-text: #2f261e;
+  --auth-muted: #6c6259;
+  --auth-accent: #d88b74;
+  --auth-accent-hover: #c6775f;
+  --auth-accent-soft: rgba(216, 139, 116, 0.16);
+  --auth-shadow: 0 22px 55px rgba(69, 54, 40, 0.14);
+  --auth-radius: 28px;
+  --auth-input-radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.flash-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.flash-message {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease,
+    max-height 0.25s ease,
+    margin 0.25s ease,
+    padding 0.25s ease;
+}
+
+.flash-message.is-closing {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.flash-message.is-hidden {
+  max-height: 0;
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  border-width: 0;
+  opacity: 0;
+}
+
+.flash-message__text {
+  flex: 1;
+}
+
+.flash-message__close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+  color: currentColor;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.flash-message__close:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
